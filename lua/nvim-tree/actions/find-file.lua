@@ -13,33 +13,35 @@ function M.fn(fname)
   end
   running[fname] = true
 
-  local i = view.is_root_folder_visible() and 1 or 0
+  local i = core.get_nodes_starting_line() - 1
   local tree_altered = false
 
   local function iterate_nodes(nodes)
     for _, node in ipairs(nodes) do
-      i = i + 1
-      if node.absolute_path == fname then
-        return i
-      end
-
-      local path_matches = node.nodes and vim.startswith(fname, node.absolute_path .. utils.path_separator)
-      if path_matches then
-        if not node.open then
-          node.open = true
-          tree_altered = true
-        end
-
-        if #node.nodes == 0 then
-          core.get_explorer():expand(node)
-        end
-
-        if iterate_nodes(node.nodes) ~= nil then
+      if not node.hidden then
+        i = i + 1
+        if node.absolute_path == fname then
           return i
         end
-        -- mandatory to iterate i
-      elseif node.open then
-        iterate_nodes(node.nodes)
+
+        local path_matches = node.nodes and vim.startswith(fname, node.absolute_path .. utils.path_separator)
+        if path_matches then
+          if not node.open then
+            node.open = true
+            tree_altered = true
+          end
+
+          if #node.nodes == 0 then
+            core.get_explorer():expand(node)
+          end
+
+          if iterate_nodes(node.nodes) ~= nil then
+            return i
+          end
+          -- mandatory to iterate i
+        elseif node.open then
+          iterate_nodes(node.nodes)
+        end
       end
     end
   end

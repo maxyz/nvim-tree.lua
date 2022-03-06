@@ -78,7 +78,7 @@ function M.fn()
   end
 
   if found_something and view.is_visible() then
-    if view.is_root_folder_visible() then
+    if view.is_root_folder_visible(core.get_cwd()) then
       index = index + 1
     end
 

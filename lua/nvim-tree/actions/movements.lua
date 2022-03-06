@@ -3,7 +3,6 @@ local view = require "nvim-tree.view"
 local diagnostics = require "nvim-tree.diagnostics"
 local renderer = require "nvim-tree.renderer"
 local core = require "nvim-tree.core"
-
 local lib = function()
   return require "nvim-tree.lib"
 end
@@ -17,19 +16,21 @@ local function get_line_from_node(node, find_parent)
     node_path = node.absolute_path:match("(.*)" .. utils.path_separator)
   end
 
-  local line = 2
+  local line = core.get_nodes_starting_line()
   local function iter(nodes, recursive)
     for _, _node in ipairs(nodes) do
-      local n = lib().get_last_group_node(_node)
-      if node_path == n.absolute_path then
-        return line, _node
-      end
+      if not _node.hidden then
+        local n = lib().get_last_group_node(_node)
+        if node_path == n.absolute_path then
+          return line, _node
+        end
 
-      line = line + 1
-      if _node.open == true and recursive then
-        local _, child = iter(_node.nodes, recursive)
-        if child ~= nil then
-          return line, child
+        line = line + 1
+        if _node.open == true and recursive then
+          local _, child = iter(_node.nodes, recursive)
+          if child ~= nil then
+            return line, child
+          end
         end
       end
     end
@@ -38,36 +39,28 @@ local function get_line_from_node(node, find_parent)
 end
 
 function M.parent_node(should_close)
+  should_close = should_close or false
+
   return function(node)
     if node.name == ".." then
       return
     end
 
-    should_close = should_close or false
-    local altered_tree = false
-
-    local iter = get_line_from_node(node, true)
+    local line, parent = get_line_from_node(node, true)(core.get_explorer().nodes, true)
     if node.open == true and should_close then
       node.open = false
-      altered_tree = true
+      view.set_cursor { line, 0 }
     else
-      local line, parent = iter(core.get_explorer().nodes, true)
       if parent == nil then
         line = 1
       elseif should_close then
         parent.open = false
-        altered_tree = true
-      end
-      if not view.is_root_folder_visible() then
-        line = line - 1
       end
       view.set_cursor { line, 0 }
     end
 
-    if altered_tree then
-      diagnostics.update()
-      renderer.draw()
-    end
+    diagnostics.update()
+    renderer.draw()
   end
 end
 
@@ -91,7 +84,7 @@ function M.sibling(direction)
     end
 
     if line > 0 then
-      parent = core.get_explorer()
+      parent = core.get_explorer().nodes
     else
       _, parent = iter(core.get_explorer().nodes, true)
       if parent ~= nil and #parent.nodes > 1 then
@@ -111,9 +104,6 @@ function M.sibling(direction)
     local target_node = parent.nodes[index]
 
     line, _ = get_line_from_node(target_node)(core.get_explorer().nodes, true)
-    if not view.is_root_folder_visible() then
-      line = line - 1
-    end
     view.set_cursor { line, 0 }
   end
 end
@@ -121,7 +111,10 @@ end
 function M.find_git_item(where)
   return function()
     local node_cur = lib().get_node_at_cursor()
-    local nodes_by_line = lib().get_nodes_by_line(core.get_explorer().nodes, view.View.hide_root_folder and 1 or 2)
+    local nodes_by_line = lib().get_nodes_by_line(
+      core.get_explorer().nodes,
+      core.get_nodes_starting_line()
+    )
 
     local cur, first, prev, nex = nil, nil, nil, nil
     for line, node in pairs(nodes_by_line) do
